@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Agencia {
+  id           String   @id @default(uuid())
+  nombre       String
+  nif          String?
+  direccion    String?
+  email        String?
+  telefono     String?
+  configFiscal String   @default("{\"igic_por_defecto\":7.0,\"irpf_por_defecto\":15.0,\"redondeo\":\"centimo\",\"moneda\":\"EUR\",\"comision_agencia_defecto\":40.0}")
+  plan         String   @default("premium")
+  estado       String   @default("activa")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  usuarios     Usuario[]
+  propiedades  Propiedad[]
+  clientes     Cliente[]
+  operaciones  Operacion[]
+  reglas       ReglaComision[]
+  liquidaciones Liquidacion[]
+  auditorias   Auditoria[]
+
+  @@map("agencias")
+}
+
+model Usuario {
+  id             String   @id @default(uuid())
+  agenciaId      String
+  email          String   @unique
+  passwordHash   String
+  nombreCompleto String
+  rol            String   @default("agente")
+  telefono       String?
+  nif            String?
+  tipoFiscal     String   @default("autonomo")
+  configFiscal   String   @default("{\"aplica_irpf\":true,\"porcentaje_irpf\":15.0,\"aplica_igic\":false,\"porcentaje_igic\":0,\"modelo_igic\":\"adicional\",\"iban\":\"\",\"observaciones\":\"\"}")
+  objetivos      String   @default("{\"ventas_mes\":3,\"facturacion_mes\":15000,\"bonus_por_objetivo\":500}")
+  avatarUrl      String?
+  estado         String   @default("activo")
+  fechaAlta      DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  agencia        Agencia  @relation(fields: [agenciaId], references: [id])
+
+  propiedadesCaptadas Propiedad[] @relation("PropiedadCaptador")
+  operacionesCreadas  Operacion[] @relation("OperacionCreador")
+  operacionesValidadas Operacion[] @relation("OperacionValidador")
+  comisiones          ComisionSplit[]
+  documentosSubidos   Documento[]
+  liquidaciones       Liquidacion[]
+  auditorias          Auditoria[]
+
+  @@map("usuarios")
+}
+
+model Propiedad {
+  id                  String   @id @default(uuid())
+  agenciaId           String
+  referencia          String
+  tipo                String   @default("piso")
+  direccion           String
+  ciudad              String?
+  codigoPostal        String?
+  precioVentaObjetivo Float
+  metrosCuadrados     Int?
+  habitaciones        Int?
+  banos               Int?
+  captadorId          String?
+  fechaCaptacion      DateTime @default(now())
+  estado              String   @default("disponible")
+  observaciones       String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  agencia    Agencia    @relation(fields: [agenciaId], references: [id])
+  captador   Usuario?   @relation("PropiedadCaptador", fields: [captadorId], references: [id])
+  operaciones Operacion[]
+
+  @@map("propiedades")
+}
+
+model Cliente {
+  id             String   @id @default(uuid())
+  agenciaId      String
+  tipo           String   @default("comprador")
+  nombreCompleto String
+  email          String?
+  telefono       String?
+  nif            String?
+  observaciones  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  agencia                Agencia     @relation(fields: [agenciaId], references: [id])
+  operacionesComprador   Operacion[] @relation("OperacionComprador")
+  operacionesVendedor    Operacion[] @relation("OperacionVendedor")
+
+  @@map("clientes")
+}
+
+model Operacion {
+  id                   String    @id @default(uuid())
+  agenciaId            String
+  propiedadId          String?
+  compradorId          String?
+  vendedorClienteId    String?
+  numeroOperacion      String    @unique
+  estado               String    @default("lead")
+  precioVenta          Float
+  comisionTotalPorc    Float     @default(3.5)
+  comisionTotalImporte Float     @default(0)
+  quienPagaComision    String    @default("vendedor")
+  gastosOperacion      Float     @default(0)
+  fechaReserva         DateTime?
+  fechaFirma           DateTime?
+  fechaCierre          DateTime?
+  observaciones        String?
+  createdBy            String
+  validadoPor          String?
+  validadoAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  agencia          Agencia        @relation(fields: [agenciaId], references: [id])
+  propiedad        Propiedad?     @relation(fields: [propiedadId], references: [id])
+  comprador        Cliente?       @relation("OperacionComprador", fields: [compradorId], references: [id])
+  vendedorCliente  Cliente?       @relation("OperacionVendedor", fields: [vendedorClienteId], references: [id])
+  creador          Usuario        @relation("OperacionCreador", fields: [createdBy], references: [id])
+  validador        Usuario?       @relation("OperacionValidador", fields: [validadoPor], references: [id])
+  comisiones       ComisionSplit[]
+  documentos       Documento[]
+
+  @@map("operaciones")
+}
+
+model ComisionSplit {
+  id              String    @id @default(uuid())
+  operacionId     String
+  usuarioId       String
+  rolSplit        String
+  porcentajeSplit Float
+  importeBruto    Float
+  retencionIrpf   Float     @default(0)
+  igic            Float     @default(0)
+  otrosAjustes    Float     @default(0)
+  importeNeto     Float
+  motivoAjuste    String?
+  estadoPago      String    @default("pendiente")
+  fechaPago       DateTime?
+  referenciaPago  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  operacion Operacion @relation(fields: [operacionId], references: [id])
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id])
+
+  @@map("comisiones_split")
+}
+
+model ReglaComision {
+  id             String   @id @default(uuid())
+  agenciaId      String
+  nombreRegla    String
+  tipoPropiedad  String?
+  activa         Boolean  @default(true)
+  prioridad      Int      @default(1)
+  splitsConfig   String   @default("{\"captador\":30,\"vendedor\":30,\"agencia\":40}")
+  condiciones    String   @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  agencia Agencia @relation(fields: [agenciaId], references: [id])
+
+  @@map("reglas_comision")
+}
+
+model Documento {
+  id             String   @id @default(uuid())
+  operacionId    String
+  tipoDocumento  String
+  nombreArchivo  String
+  urlStorage     String   @default("")
+  tamanoBytes    Int      @default(0)
+  subidoPor      String
+  createdAt      DateTime @default(now())
+
+  operacion Operacion @relation(fields: [operacionId], references: [id])
+  usuario   Usuario   @relation(fields: [subidoPor], references: [id])
+
+  @@map("documentos")
+}
+
+model Liquidacion {
+  id               String    @id @default(uuid())
+  agenciaId        String
+  usuarioId        String
+  periodo          String
+  totalOperaciones Int       @default(0)
+  totalBruto       Float     @default(0)
+  totalRetenciones Float     @default(0)
+  totalNeto        Float     @default(0)
+  estado           String    @default("borrador")
+  pdfUrl           String?
+  generadaAt       DateTime  @default(now())
+  pagadaAt         DateTime?
+
+  agencia Agencia @relation(fields: [agenciaId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@map("liquidaciones")
+}
+
+model Auditoria {
+  id                String   @id @default(uuid())
+  agenciaId         String
+  usuarioId         String
+  tabla             String
+  registroId        String
+  accion            String
+  valoresAnteriores String?
+  valoresNuevos     String?
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime @default(now())
+
+  agencia Agencia @relation(fields: [agenciaId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@map("auditorias")
+}
