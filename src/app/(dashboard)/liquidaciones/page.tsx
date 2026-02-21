@@ -177,6 +177,9 @@ export default function LiquidacionesPage() {
                   <th className="text-center text-xs font-medium text-slate-500 uppercase px-6 py-3">
                     Estado
                   </th>
+                  <th className="text-center text-xs font-medium text-slate-500 uppercase px-6 py-3">
+                    PDF
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -207,6 +210,19 @@ export default function LiquidacionesPage() {
                     </td>
                     <td className="px-6 py-4 text-center">
                       <Badge estado={l.estado} />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <a
+                        href={`/api/liquidaciones/${l.id}/pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Ver PDF
+                      </a>
                     </td>
                   </tr>
                 ))}
